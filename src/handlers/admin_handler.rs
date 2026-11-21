@@ -1,0 +1,683 @@
+use axum::extract::{Extension, Path, Query, State};
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
+use serde_json::json;
+use mongodb::bson::{doc, oid::ObjectId};
+
+use crate::database::oid_from_hex;
+use crate::middleware::AppState;
+use crate::middleware::auth::{CurrentUser, require_admin};
+use crate::services::public_service::PublicService;
+use crate::services::registration_service::RegistrationService;
+use crate::models::registration::RegistrationQuery;
+use crate::models::admin::AddAdminInput;
+use crate::errors::AppError;
+
+fn require(admin_user: &CurrentUser) -> Result<(), crate::errors::AppError> {
+    if admin_user.role == "admin" {
+        Ok(())
+    } else {
+        Err(crate::errors::AppError::Forbidden("Admins only.".into()))
+    }
+}
+
+pub async fn admin_fest(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::fest::FestInfoInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let fest = svc.update_fest(input).await?;
+    let value = serde_json::json!({ "fest": fest });
+    Ok(Json(value))
+}
+
+pub async fn admin_fest_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_fest().await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+pub async fn admin_payment_info(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::payment::PaymentInfoInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let payment = svc.update_payment_info(input).await?;
+    let value = serde_json::json!({ "payment": payment });
+    Ok(Json(value))
+}
+
+pub async fn admin_payment_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_payment_info().await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- events ---
+
+pub async fn admin_event_create(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::event::EventInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.create_event(input).await?;
+    let value = serde_json::json!({ "event": item });
+    Ok(Json(value))
+}
+
+pub async fn admin_event_update(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::event::EventInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.update_event(&id, input).await?;
+    let value = serde_json::json!({ "event": item });
+    Ok(Json(value))
+}
+
+pub async fn admin_event_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_event(&id).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- workshops ---
+
+pub async fn admin_workshop_create(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::workshop::WorkshopInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.create_workshop(input).await?;
+    Ok(Json(json!({ "workshop": item })))
+}
+
+pub async fn admin_workshop_update(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::workshop::WorkshopInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.update_workshop(&id, input).await?;
+    Ok(Json(json!({ "workshop": item })))
+}
+
+pub async fn admin_workshop_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_workshop(&id).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- team ---
+
+pub async fn admin_team_create(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::team::TeamMemberInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.create_team_member(input).await?;
+    Ok(Json(json!({ "team": item })))
+}
+
+pub async fn admin_team_update(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::team::TeamMemberInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.update_team_member(&id, input).await?;
+    Ok(Json(json!({ "team": item })))
+}
+
+pub async fn admin_team_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_team_member(&id).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- sponsors ---
+
+pub async fn admin_sponsor_create(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::sponsor::SponsorInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.create_sponsor(input).await?;
+    Ok(Json(json!({ "sponsor": item })))
+}
+
+pub async fn admin_sponsor_update(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::sponsor::SponsorInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.update_sponsor(&id, input).await?;
+    Ok(Json(json!({ "sponsor": item })))
+}
+
+pub async fn admin_sponsor_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_sponsor(&id).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- mess options ---
+
+pub async fn admin_mess_option_create(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::mess::MessOptionInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.create_mess_option(input).await?;
+    Ok(Json(json!({ "mess": item })))
+}
+
+pub async fn admin_mess_option_update(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    let input: crate::models::mess::MessOptionInput = serde_json::from_value(body)
+        .map_err(|e| crate::errors::AppError::Validation(e.to_string()))?;
+    let item = svc.update_mess_option(&id, input).await?;
+    Ok(Json(json!({ "mess": item })))
+}
+
+pub async fn admin_mess_option_delete(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = PublicService::new(state.db.clone());
+    svc.delete_mess_option(&id).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- registrations ---
+
+pub async fn admin_registrations(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Query(query): Query<RegistrationQuery>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = RegistrationService::new(state.db.clone());
+    let regs = svc.list_registrations(&query).await?;
+    Ok(Json(json!({ "registrations": regs })))
+}
+
+pub async fn admin_create_registrations (
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+
+    // Extracting fields
+    let participant_name = body.get("participantName").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let participant_email = body.get("participantEmail").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let participant_phone = body.get("participantPhone").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let college = body.get("college").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let visit_days = body.get("visitDays").and_then(|v| v.as_i64()).unwrap_or(0);
+    let competition_ids: Vec<String> = body
+        .get("competitions")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Validate
+    if participant_name.trim().is_empty()
+        || participant_email.trim().is_empty()
+        || college.trim().is_empty()
+        || visit_days < 1
+        || competition_ids.is_empty()
+    {
+        return Err(AppError::Validation(
+            "Participant name, email, college, at least 1 visit day and at least one competition are required.".into(),
+        ));
+    }
+
+    // Resolve the participant's user id from their email (email is uniquely indexed).
+    let user_doc = state
+        .db
+        .users
+        .find_one(doc! { "email": participant_email.trim() }, None)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| {
+            return AppError::Validation("No user account exists with this email. Ask them to sign up first.".into())
+        })?;
+
+    let user_id = user_doc.get_object_id("_id").unwrap_or_default();
+    let svc = RegistrationService::new(state.db.clone());
+    let mut created = Vec::new();
+
+    // One registration per selected competition (frontend sends multiple target ids)
+    for comp_id_s in &competition_ids {
+        let target_id = oid_from_hex(comp_id_s).map_err(|_| AppError::Validation("Invalid competition id".into()))?;
+        let target_name = state
+            .db
+            .events
+            .find_one(doc! { "_id": target_id }, None)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?
+            .and_then(|ev| ev.get_str("name").ok().map(str::to_string))
+            .unwrap_or_default();
+
+        let reg = svc.admin_create_event_registration(&user_id, &target_id, &target_name).await?;
+        created.push(reg);
+    }
+    Ok(Json(json!({
+        "registration": created.first(),
+        "participantName": participant_name,
+        "participantPhone": participant_phone,
+        "college": college,
+        "visitDays": visit_days,
+        "competitions": created,
+    })))
+}
+
+pub async fn admin_decide_registration(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path((id, action)): Path<(String, String)>,
+    body: Option<axum::extract::Json<serde_json::Value>>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    if action != "approve" && action != "reject" {
+        return Err(crate::errors::AppError::NotFound("Invalid action".into()));
+    }
+    let reason = body
+        .and_then(|axum::extract::Json(body)| {
+            body.get("reason")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        });
+    let svc = RegistrationService::new(state.db.clone());
+    let reg = svc.decide_registration(&id, &action, reason.as_deref()).await?;
+    // Email the participant (approval with details, or rejection with the reason).
+    // Runs in the background so a slow/failed mail server never blocks or fails the admin action.
+    let reg_for_mail = reg.clone();
+    tokio::spawn(async move {
+        crate::services::mailer_service::send_decision_email(&reg_for_mail).await;
+    });
+    let value = serde_json::json!({ "registration": reg });
+    Ok(Json(value))
+}
+
+/// Desk verification: GET /admin/registrations/{id}/verify
+/// Admin-only. Returns the live registration; `valid` is true only when it is approved.
+pub async fn admin_verify_registration(
+    State(state): State<AppState>,
+    Extension(current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&current_user)?;
+    let svc = RegistrationService::new(state.db.clone());
+    let reg = svc.verify_registration(&id).await?;
+    Ok(Json(json!({ "valid": reg.status == "approved", "registration": reg })))
+}
+
+pub async fn admin_export_csv(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let svc = RegistrationService::new(state.db.clone());
+    let csv = svc.export_csv().await?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (header::CONTENT_DISPOSITION, "attachment; filename=\"registrations.csv\""),
+        ],
+        csv,
+    )
+        .into_response())
+}
+
+// --- admins ---
+
+pub async fn admin_admins_list(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+) -> Result<Json<serde_json::Value>, crate::errors::AppError> {
+    require(&_current_user)?;
+    let mut cursor = state.db.admins.find(mongodb::bson::doc! {}, None).await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let mut emails = Vec::new();
+    while cursor.advance().await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))? {
+        let doc = cursor.deserialize_current().map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+        emails.push(doc.get_str("email").unwrap_or("").to_string());
+    }
+    let value = serde_json::json!({ "admins": emails });
+    Ok(Json(value))
+}
+
+pub async fn admin_add_admin(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<AddAdminInput>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let now = crate::database::now();
+    let exists = state.db.admins.count_documents(mongodb::bson::doc! { "email": &body.email }, None).await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    if exists > 0 {
+        let value = serde_json::json!({ "ok": true });
+        return Ok(Json(value));
+    }
+    state.db.admins.insert_one(mongodb::bson::doc! { "email": &body.email, "created_at": now }, None).await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let _ = state.db.users.update_one(
+        mongodb::bson::doc! { "email": &body.email },
+        mongodb::bson::doc! { "$set": { "role": "admin", "updated_at": now } },
+        None,
+    ).await;
+    let value = serde_json::json!({ "ok": true });
+    Ok(Json(value))
+}
+
+pub async fn admin_remove_admin(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(email): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let now = crate::database::now();
+    state.db.admins.delete_one(mongodb::bson::doc! { "email": &email }, None).await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let _ = state.db.users.update_one(
+        mongodb::bson::doc! { "email": &email },
+        mongodb::bson::doc! { "$set": { "role": "user", "updated_at": now } },
+        None,
+    ).await;
+    let value = serde_json::json!({ "ok": true });
+    Ok(Json(value))
+}
+
+// --- assigned user QRs ---
+
+pub async fn admin_list_qrs(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+) -> Result<Json<serde_json::Value>, crate::errors::AppError> {
+    require(&_current_user)?;
+    let mut cursor = state.db.user_qrs.find(mongodb::bson::doc! {}, None).await
+        .map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let mut qrs = Vec::new();
+    while cursor.advance().await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))? {
+        let d = cursor.deserialize_current().map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+        let user_id = d.get_object_id("user_id").ok();
+        let mut email = String::new();
+        if let Some(uid) = user_id {
+            if let Ok(Some(u)) = state.db.users.find_one(mongodb::bson::doc! { "_id": uid }, None).await {
+                email = u.get_str("email").unwrap_or("").to_string();
+            }
+        }
+        qrs.push(json!({
+            "id": d.get_object_id("_id").ok().map(|v| v.to_hex()).unwrap_or_default(),
+            "email": email,
+            "kind": d.get_str("kind").unwrap_or("event"),
+            "label": d.get_str("label").unwrap_or(""),
+            "qrUrl": d.get_str("qr_url").unwrap_or(""),
+        }));
+    }
+    Ok(Json(json!({ "qrs": qrs })))
+}
+
+pub async fn admin_add_qr(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let email = body.get("email").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let kind = body.get("kind").and_then(|v| v.as_str()).unwrap_or("").trim().to_lowercase();
+    let label = body.get("label").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    if email.is_empty() || !["mess", "event"].contains(&kind.as_str()) || label.is_empty() {
+        return Err(AppError::Validation("Email, kind and label are required.".into()));
+    }
+    let user = state.db.users.find_one(mongodb::bson::doc! { "email": &email }, None).await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::Validation("No account exists with that email.".into()))?;
+    let user_id = user.get_object_id("_id").map_err(|e| AppError::Internal(e.to_string()))?;
+    let mut registration_id: Option<ObjectId> = None;
+    for collection in [
+        &state.db.event_registrations,
+        &state.db.workshop_registrations,
+        &state.db.accommodation_registrations,
+        &state.db.registrations,
+    ] {
+        let doc = collection.find_one(
+            doc! {
+                "user_id": user_id,
+                "status": "approved",
+                "kind": kind.clone(),
+                "$or": [
+                    { "target_name": &label },
+                    { "mess_name": &label },
+                ]
+            },
+            None,
+        ).await.map_err(|e| AppError::Internal(e.to_string()))?;
+        if let Some(doc) = doc {
+            registration_id = doc.get_object_id("_id").ok();
+            break;
+        }
+    }
+    let registration_id = registration_id
+        .ok_or_else(|| AppError::Validation("No approved matching event or mess registration exists for this user.".into()))?;
+    let qr_url = crate::services::registration_service::generate_qr_url(&registration_id.to_hex());
+    let now = crate::database::now();
+    let result = state.db.user_qrs.insert_one(mongodb::bson::doc! {
+        "user_id": user_id,
+        "kind": kind.clone(),
+        "label": label.clone(),
+        "qr_url": qr_url.clone(),
+        "created_at": now,
+        "updated_at": now,
+    }, None).await.map_err(|e| AppError::Internal(e.to_string()))?;
+    let id = result.inserted_id.as_object_id().unwrap_or_default();
+    Ok(Json(json!({ "qr": { "id": id.to_hex(), "email": email, "kind": kind, "label": label, "qrUrl": qr_url } })))
+}
+
+pub async fn admin_remove_qr(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let oid = oid_from_hex(&id).map_err(|e| AppError::Validation(e.to_string()))?;
+    state.db.user_qrs.delete_one(mongodb::bson::doc! { "_id": oid }, None).await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// --- notices ---
+
+fn notice_json(d: &mongodb::bson::Document) -> serde_json::Value {
+    json!({
+        "id": d.get_object_id("_id").ok().map(|v| v.to_hex()).unwrap_or_default(),
+        "title": d.get_str("title").unwrap_or(""),
+        "message": d.get_str("message").unwrap_or(""),
+        "link": d.get_str("link").unwrap_or(""),
+        "priority": d.get_i32("priority").unwrap_or(d.get_i64("priority").unwrap_or(0) as i32),
+        "active": d.get_bool("active").unwrap_or(true),
+        "expiresAt": d.get_datetime("expires_at").ok().map(|v| v.to_rfc3339_string()).unwrap_or_default(),
+    })
+}
+
+pub async fn admin_list_notices(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+) -> Result<Json<serde_json::Value>, crate::errors::AppError> {
+    require(&_current_user)?;
+    let mut cursor = state.db.notices.find(mongodb::bson::doc! {}, None).await
+        .map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let mut notices = Vec::new();
+    while cursor.advance().await.map_err(|e| crate::errors::AppError::Internal(e.to_string()))? {
+        notices.push(notice_json(&cursor.deserialize_current().map_err(|e| crate::errors::AppError::Internal(e.to_string()))?));
+    }
+    Ok(Json(json!({ "notices": notices })))
+}
+
+pub async fn admin_add_notice(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let title = body.get("title").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    if title.is_empty() || message.is_empty() {
+        return Err(AppError::Validation("Title and message are required.".into()));
+    }
+    let link = body.get("link").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let priority = body.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
+    let active = body.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+    let expires_at = parse_optional_datetime(body.get("expiresAt").and_then(|v| v.as_str()).unwrap_or(""));
+    let now = crate::database::now();
+    let mut doc = mongodb::bson::doc! {
+        "title": title.clone(),
+        "message": message.clone(),
+        "link": link.clone(),
+        "priority": priority,
+        "active": active,
+        "created_at": now,
+        "updated_at": now,
+    };
+    if let Some(expires) = expires_at { doc.insert("expires_at", expires); }
+    let result = state.db.notices.insert_one(doc, None).await
+        .map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let id = result.inserted_id.as_object_id().unwrap_or_default();
+    Ok(Json(json!({ "notice": { "id": id.to_hex(), "title": title, "message": message, "link": link, "priority": priority, "active": active } })))
+}
+
+fn parse_optional_datetime(value: &str) -> Option<mongodb::bson::DateTime> {
+    if value.trim().is_empty() { return None; }
+    chrono::DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|d| mongodb::bson::DateTime::from_millis(d.timestamp_millis()))
+}
+
+pub async fn admin_update_notice(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let oid = oid_from_hex(&id).map_err(|e| AppError::Validation(e.to_string()))?;
+    let title = body.get("title").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    if title.is_empty() || message.is_empty() {
+        return Err(AppError::Validation("Title and message are required.".into()));
+    }
+    let mut set = mongodb::bson::doc! {
+        "title": title,
+        "message": message,
+        "link": body.get("link").and_then(|v| v.as_str()).unwrap_or("").trim(),
+        "priority": body.get("priority").and_then(|v| v.as_i64()).unwrap_or(0),
+        "active": body.get("active").and_then(|v| v.as_bool()).unwrap_or(true),
+        "updated_at": crate::database::now(),
+    };
+    if let Some(expires) = parse_optional_datetime(body.get("expiresAt").and_then(|v| v.as_str()).unwrap_or("")) {
+        set.insert("expires_at", expires);
+    } else {
+        set.insert("expires_at", mongodb::bson::Bson::Null);
+    }
+    state.db.notices.update_one(mongodb::bson::doc! { "_id": oid }, mongodb::bson::doc! { "$set": set }, None).await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+pub async fn admin_remove_notice(
+    State(state): State<AppState>,
+    Extension(_current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, crate::errors::AppError> {
+    require(&_current_user)?;
+    let oid = oid_from_hex(&id).map_err(|e| AppError::Validation(e.to_string()))?;
+    state.db.notices.delete_one(mongodb::bson::doc! { "_id": oid }, None).await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "ok": true })))
+}

@@ -1,0 +1,99 @@
+use bson::{oid::ObjectId, DateTime};
+use serde::{Deserialize, Serialize};
+use validator::Validate;
+
+use crate::models::{deserialize_dt, serialize_dt, serialize_oid};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct User {
+    #[serde(rename(serialize = "id", deserialize = "_id"), serialize_with = "serialize_oid")]
+    pub id: Option<ObjectId>,
+    pub name: String,
+    pub email: String,
+    pub phone: String,
+    pub college: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub email_verified: bool,
+    #[serde(alias = "password_hash")]
+    pub password_hash: String,
+    pub role: String,
+    #[serde(
+        default,
+        alias = "created_at",
+        deserialize_with = "deserialize_dt",
+        serialize_with = "serialize_dt"
+    )]
+    pub created_at: Option<DateTime>,
+    #[serde(
+        default,
+        alias = "updated_at",
+        deserialize_with = "deserialize_dt",
+        serialize_with = "serialize_dt"
+    )]
+    pub updated_at: Option<DateTime>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct SignupInput {
+    #[validate(length(min = 2, message = "Enter your full name."))]
+    pub name: String,
+    #[validate(email(message = "Enter a valid email address."))]
+    pub email: String,
+    #[validate(length(min = 8, message = "Use at least 8 characters."))]
+    pub password: String,
+    #[validate(length(min = 10, max = 15, message = "Enter a 10-digit phone number."))]
+    pub phone: String,
+    #[validate(length(min = 1, message = "Enter your college."))]
+    pub college: String,
+    #[validate(length(min = 1, message = "Enter your institution state."))]
+    pub state: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LoginInput {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ForgotPasswordInput {
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResetPasswordInput {
+    pub email: String,
+    pub otp: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserView {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+    pub phone: String,
+    pub college: String,
+    pub state: String,
+    pub email_verified: bool,
+    pub role: String,
+}
+
+impl User {
+    pub fn view(&self) -> UserView {
+        UserView {
+            id: self.id.as_ref().map(|o| o.to_hex()).unwrap_or_default(),
+            name: self.name.clone(),
+            email: self.email.clone(),
+            phone: self.phone.clone(),
+            college: self.college.clone(),
+            state: self.state.clone(),
+            email_verified: self.email_verified,
+            role: self.role.clone(),
+        }
+    }
+}
