@@ -49,7 +49,11 @@ impl Config {
                 .ok()
                 .and_then(|v| parse_duration_secs(&v))
                 .unwrap_or(24 * 60 * 60),
-            cors_origin: env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:5173".into()),
+            cors_origin: env::var("CORS_ORIGIN")
+                .unwrap_or_else(|_| "http://localhost:5173".into())
+                .trim()
+                .trim_end_matches('/')
+                .to_string(),
             seed_on_start: env::var("SEED_ON_START")
                 .ok()
                 .and_then(|v| v.parse::<bool>().ok())

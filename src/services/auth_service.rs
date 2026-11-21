@@ -19,7 +19,7 @@ pub(crate) const DEFAULT_ADMIN_EMAIL: &str = "b25347@students.iitmandi.ac.in";
 /// Build the Set-Cookie header value for a session token.
 pub fn set_token_cookie(config: &Config, token: &str) -> HeaderValue {
     format!(
-        "{}={}; HttpOnly; Path=/; SameSite=Lax; Max-Age={}",
+        "{}={}; HttpOnly; Secure; Path=/; SameSite=None; Max-Age={}",
         TOKEN_COOKIE, token, config.jwt_expires
     )
     .parse()
@@ -29,7 +29,7 @@ pub fn set_token_cookie(config: &Config, token: &str) -> HeaderValue {
 /// Build the Set-Cookie header value to clear the session token.
 pub fn clear_token_cookie(config: &Config) -> HeaderValue {
     let _ = config;
-    HeaderValue::from_static("xpecto_token=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0")
+    HeaderValue::from_static("xpecto_token=; HttpOnly; Secure; Path=/; SameSite=None; Max-Age=0")
 }
 
 pub struct AuthService {
