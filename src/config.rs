@@ -42,8 +42,8 @@ impl Config {
             port: env::var("PORT")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(3000),
-            host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into()),
+                .unwrap_or(8080),
+            host: "0.0.0.0".into(),
             jwt_secret: env::var("JWT_SECRET").unwrap_or_else(|_| "change-me-in-production".into()),
             jwt_expires: env::var("JWT_EXPIRES")
                 .ok()
