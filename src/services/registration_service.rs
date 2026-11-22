@@ -736,14 +736,7 @@ fn is_duplicate_key(e: &mongodb::error::Error) -> bool {
 }
 
 pub(crate) fn generate_qr_url(id: &str) -> String {
-    let front = std::env::var("CORS_ORIGIN")
-        .unwrap_or_else(|_| "http://localhost:5173".into())
-        .split(',')
-        .next()
-        .unwrap_or("http://localhost:5173")
-        .trim()
-        .trim_end_matches('/')
-        .to_string();
+    let front = std::env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:5173".into());
     let payload = format!("{}/admin?tab=verify&verify={}", front.trim_end_matches('/'), id);
     generate_qr_png_data_url(&payload).unwrap_or_default()
 }

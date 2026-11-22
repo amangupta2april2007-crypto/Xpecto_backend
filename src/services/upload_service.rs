@@ -16,14 +16,9 @@ pub struct UploadService {
 
 impl UploadService {
     pub fn new(config: &Config) -> Self {
-        let base_url = config
-            .cors_origins
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "http://localhost:5173".into());
         Self {
             upload_dir: config.upload_dir.clone(),
-            base_url,
+            base_url: config.cors_origin.clone(),
         }
     }
 

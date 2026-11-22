@@ -9,7 +9,7 @@ pub struct Config {
     pub host: String,
     pub jwt_secret: String,
     pub jwt_expires: i64,
-    pub cors_origins: Vec<String>,
+    pub cors_origin: String,
     pub seed_on_start: bool,
     pub upload_dir: String,
     pub admin_email: Option<String>,
@@ -49,12 +49,11 @@ impl Config {
                 .ok()
                 .and_then(|v| parse_duration_secs(&v))
                 .unwrap_or(24 * 60 * 60),
-            cors_origins: env::var("CORS_ORIGIN")
+            cors_origin: env::var("CORS_ORIGIN")
                 .unwrap_or_else(|_| "http://localhost:5173".into())
-                .split(',')
-                .map(|origin| origin.trim().trim_end_matches('/').to_string())
-                .filter(|origin| !origin.is_empty())
-                .collect(),
+                .trim()
+                .trim_end_matches('/')
+                .to_string(),
             seed_on_start: env::var("SEED_ON_START")
                 .ok()
                 .and_then(|v| v.parse::<bool>().ok())
