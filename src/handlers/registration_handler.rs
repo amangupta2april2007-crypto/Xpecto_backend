@@ -50,10 +50,9 @@ pub async fn create_registration(
     let target_id = oid_from_hex(&target_id_s).map_err(|_| AppError::Validation("Invalid targetId".into()))?;
     let user_id = oid_from_hex(&current_user.id).map_err(|_| AppError::Validation("Invalid user id".into()))?;
 
-    let (screenshot_url, amount) = match file {
+    let screenshot_url = match file {
         Some((file_name, content_type, bytes)) => {
-            let url = upload_service.save_uploaded_file(&bytes, &content_type, &file_name).await?;
-            (url, 0)
+            upload_service.save_uploaded_file(&bytes, &content_type, &file_name).await?
         }
         None => return Err(AppError::Validation("screenshot is required".into())),
     };
