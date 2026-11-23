@@ -102,9 +102,19 @@ impl MailConfig {
         let _ = dotenvy::dotenv();
         load_env_fallback();
         let get = |k: &str| std::env::var(k).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
-        let host = get("SMTP_HOST")?;
-        let username = get("SMTP_USERNAME")?;
-        let password = get("SMTP_APP_PASSWORD").or_else(|| get("SMTP_PASSWORD"))?;
+        let host = get("SMTP_HOST")?
+            .trim()
+            .trim_end_matches('/');
+        let username = get("SMTP_USERNAME")?.trim().to_string();
+        // Google App Passwords are sometimes copied with spaces between groups.
+        let password = get("SMTP_APP_PASSWORD")
+            .or_else(|| get("SMTP_PASSWORD"))?
+            .chars()
+            .filter(|ch| !ch.is_ascii_whitespace())
+            .collect::<String>();
+        if password.is_empty() {
+            return None;
+        }
         Some(Self {
             host,
             port: get("SMTP_PORT").and_then(|v| v.parse().ok()).unwrap_or(587),

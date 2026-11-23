@@ -117,7 +117,13 @@ async fn main() -> anyhow::Result<()> {
         ))
         .layer(
             CorsLayer::new()
-                .allow_origin(config.cors_origin.parse::<http::header::HeaderValue>()?)
+                .allow_origin(
+                    config
+                        .cors_origin
+                        .split(',')
+                        .filter_map(|origin| origin.trim().parse::<http::header::HeaderValue>().ok())
+                        .collect::<Vec<_>>(),
+                )
                 .allow_methods([
                     http::Method::GET,
                     http::Method::POST,
