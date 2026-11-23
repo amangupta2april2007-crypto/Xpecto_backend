@@ -202,6 +202,7 @@ impl PublicService {
                 ("updatedAt", "updated_at"),
                 ("startTime", "start_time"),
                 ("endTime", "end_time"),
+                ("imageUrl", "image_url"),
             ],
         );
         doc.insert("created_at", now);
@@ -316,6 +317,7 @@ impl PublicService {
                 ("updatedAt", "updated_at"),
                 ("startTime", "start_time"),
                 ("endTime", "end_time"),
+                ("imageUrl", "image_url"),
             ],
         );
         doc.insert("created_at", now);
@@ -358,7 +360,11 @@ impl PublicService {
         doc.insert("updated_at", now);
         self.db
             .workshops
-            .update_one(doc! { "_id": oid }, doc! { "$set": doc }, None)
+            .update_one(
+                doc! { "_id": oid },
+                doc! { "$set": doc, "$unset": { "imageUrl": "" } },
+                None,
+            )
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?;
         let doc = self

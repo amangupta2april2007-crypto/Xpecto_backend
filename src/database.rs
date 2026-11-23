@@ -258,6 +258,8 @@ impl AppDatabase {
             &self.team_members,
             &self.sponsors,
             &self.fest_info,
+            &self.mess_options,
+            &self.payment_info,
             &self.admins,
             &self.ambassadors,
             &self.registrations,
@@ -272,6 +274,16 @@ impl AppDatabase {
             ("endDate", "end_date"),
             ("startTime", "start_time"),
             ("endTime", "end_time"),
+            ("imageUrl", "image_url"),
+            ("photoUrl", "photo_url"),
+            ("logoUrl", "logo_url"),
+            ("heroImageUrl", "hero_image_url"),
+            ("qrImageUrl", "qr_image_url"),
+            ("screenshotUrl", "screenshot_url"),
+            ("confirmationQrUrl", "confirmation_qr_url"),
+            ("websiteUrl", "website_url"),
+            ("socialLink", "social_link"),
+            ("linkedinUrl", "linkedin_url"),
         ];
 
         for collection in collections {
